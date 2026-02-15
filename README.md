@@ -38,6 +38,65 @@ pglens -file queries.sql -dsn "$PG_DSN" -max-cost 500
 | `SELECT *` anti-pattern | Static analysis, no DB required |
 | Unbounded queries | `SELECT` without `WHERE` or `LIMIT` |
 
+## ⚙️ Configuration
+
+PGLens supports configuration via a `.pglens.yml` file and CLI flags.
+CLI flags **always take precedence** over file values.
+
+### `.pglens.yml` Example
+
+```yaml
+# Maximum allowed query cost (default: 1000)
+max_cost: 500
+
+# Max rows before a sequential scan triggers a warning (default: 10000)
+max_seq_scan_rows: 5000
+
+# Tables where sequential scans are acceptable
+allow_seq_scan_tables:
+  - migrations
+  - settings
+  - feature_flags
+
+# Which checks cause a non-zero exit code
+# Valid values: seq-scan, high-cost, missing-index
+fail_on:
+  - seq-scan
+  - high-cost
+  - missing-index
+```
+
+### Configuration Options
+
+| Option | CLI Flag | Default | Description |
+|--------|----------|---------|-------------|
+| `max_cost` | `-max-cost` | `1000` | Maximum allowed query cost before flagging as error |
+| `max_seq_scan_rows` | `-max-seq-scan-rows` | `10000` | Row threshold for sequential scan warnings |
+| `allow_seq_scan_tables` | — | `[]` | Tables where sequential scans are whitelisted |
+| `fail_on` | `-fail-on` | `seq-scan,high-cost,missing-index` | Comma-separated checks that cause non-zero exit |
+
+### CLI Examples
+
+```bash
+# Use a custom config file
+pglens -file queries.sql -config myproject.pglens.yml
+
+# Override max cost via CLI (takes precedence over file)
+pglens -file queries.sql -max-cost 500
+
+# Only fail on high-cost queries
+pglens -file queries.sql -fail-on high-cost
+
+# Combine: load file config, override specific thresholds
+pglens -file queries.sql -config .pglens.yml -max-cost 2000 -max-seq-scan-rows 50000
+```
+
+### Precedence Order
+
+1. CLI flags (highest priority)
+2. `.pglens.yml` file (explicit path via `-config` or auto-discovered in working directory)
+3. Built-in defaults (lowest priority)
+
 ## 💰 Pricing
 
 | Feature | Free (CLI) | Pro $79/mo | Enterprise $249/mo |
