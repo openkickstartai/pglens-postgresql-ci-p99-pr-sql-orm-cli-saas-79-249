@@ -1,0 +1,38 @@
+[
+  {
+    "Plan": {
+      "Node Type": "Nested Loop",
+      "Join Type": "Inner",
+      "Startup Cost": 0.00,
+      "Total Cost": 25432.10,
+      "Plan Rows": 500000,
+      "Plan Width": 88,
+      "Plans": [
+        {
+          "Node Type": "Seq Scan",
+          "Parent Relationship": "Outer",
+          "Relation Name": "orders",
+          "Schema": "public",
+          "Alias": "orders",
+          "Startup Cost": 0.00,
+          "Total Cost": 1234.56,
+          "Plan Rows": 50000,
+          "Plan Width": 44,
+          "Filter": "(customer_id = 42)"
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Parent Relationship": "Inner",
+          "Relation Name": "line_items",
+          "Schema": "public",
+          "Alias": "line_items",
+          "Startup Cost": 0.00,
+          "Total Cost": 812.00,
+          "Plan Rows": 10000,
+          "Plan Width": 44,
+          "Filter": "(order_id = orders.id)"
+        }
+      ]
+    }
+  }
+]

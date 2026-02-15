@@ -1,0 +1,8 @@
+{
+  "max_cost": 1000,
+  "expected_issues": [
+    {"severity": "warning", "message_contains": "Seq Scan on 'events'"},
+    {"severity": "error", "message_contains": "Cost"}
+  ],
+  "should_pass": false
+}
