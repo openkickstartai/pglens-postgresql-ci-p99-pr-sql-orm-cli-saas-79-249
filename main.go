@@ -18,6 +18,10 @@ type Config struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "analyze" {
+		runAnalyze(os.Args[2:])
+		return
+	}
 	c := Config{}
 	flag.StringVar(&c.DSN, "dsn", os.Getenv("PGLENS_DSN"), "PostgreSQL connection string")
 	flag.StringVar(&c.File, "file", "", "SQL file to analyze")
@@ -115,4 +119,65 @@ func trunc(s string, n int) string {
 		return s[:n] + "..."
 	}
 	return s
+}
+
+func runAnalyze(args []string) {
+	fs := flag.NewFlagSet("analyze", flag.ExitOnError)
+	file := fs.String("file", "", "JSON file with EXPLAIN results")
+	dir := fs.String("dir", "", "Directory with .json EXPLAIN files")
+	maxCost := fs.Float64("max-cost", 1000, "Max allowed query cost")
+	format := fs.String("format", "text", "Output: text|json|markdown")
+	fs.Parse(args)
+
+	var source string
+	switch {
+	case *file != "":
+		source = *file
+	case *dir != "":
+		source = *dir
+	default:
+		source = "-"
+	}
+
+	plans, err := ReadPlans(source)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	var results []Result
+	for i := range plans {
+		issues := WalkPlan(&plans[i], *maxCost)
+		label := plans[i].NodeType
+		if plans[i].Relation != "" {
+			label += " on " + plans[i].Relation
+		}
+		r := Result{
+			Query:  label,
+			Cost:   plans[i].Cost,
+			Issues: issues,
+			Pass:   !hasFails(issues),
+		}
+		results = append(results, r)
+	}
+
+	Render(results, *format, os.Stdout)
+	os.Exit(BatchExitCode(results))
+}
+
+func BatchExitCode(results []Result) int {
+	code := 0
+	for _, r := range results {
+		for _, issue := range r.Issues {
+			switch issue.Severity {
+			case "error":
+				code = 2
+			case "warning":
+				if code < 1 {
+					code = 1
+				}
+			}
+		}
+	}
+	return code
 }
