@@ -1,0 +1,16 @@
+[
+  {
+    "Plan": {
+      "Node Type": "Seq Scan",
+      "Parallel Aware": false,
+      "Relation Name": "user_profiles",
+      "Schema": "public",
+      "Alias": "user_profiles",
+      "Startup Cost": 0.00,
+      "Total Cost": 8234.00,
+      "Plan Rows": 200000,
+      "Plan Width": 512,
+      "Output": ["id", "username", "email", "password_hash", "avatar_url", "bio", "settings_json", "metadata", "created_at", "updated_at", "last_login_at", "is_verified", "phone", "address"]
+    }
+  }
+]
