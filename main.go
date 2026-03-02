@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 
 	_ "github.com/lib/pq"
 )
+
 
 type Config struct {
 	DSN, File, Format string
@@ -22,7 +22,8 @@ func main() {
 	flag.StringVar(&c.DSN, "dsn", os.Getenv("PGLENS_DSN"), "PostgreSQL connection string")
 	flag.StringVar(&c.File, "file", "", "SQL file to analyze")
 	flag.Float64Var(&c.MaxCost, "max-cost", 1000, "Max allowed query cost")
-	flag.StringVar(&c.Format, "format", "text", "Output: text|json|markdown")
+	flag.StringVar(&c.Format, "format", "table", "Output: json|table|github")
+
 	flag.Parse()
 	if c.File == "" {
 		fmt.Fprintln(os.Stderr, "Usage: pglens -file queries.sql [-dsn postgres://...]")
@@ -61,7 +62,6 @@ func ParseSQL(path string) ([]string, error) {
 	}
 	return out, nil
 }
-
 func Render(results []Result, format string, w io.Writer) int {
 	code := 0
 	for _, r := range results {
@@ -69,50 +69,24 @@ func Render(results []Result, format string, w io.Writer) int {
 			code = 1
 		}
 	}
-	switch format {
-	case "json":
-		json.NewEncoder(w).Encode(results)
-	case "markdown":
-		fmt.Fprintln(w, "## \U0001F50D PGLens Analysis Report\n")
-		for i, r := range results {
-			icon := "\u2705"
-			if !r.Pass {
-				icon = "\u274C"
-			}
-			fmt.Fprintf(w, "### %s Query %d\n```sql\n%s\n```\n", icon, i+1, trunc(r.Query, 200))
-			if r.Cost > 0 {
-				fmt.Fprintf(w, "**Cost:** %.1f\n\n", r.Cost)
-			}
-			for _, is := range r.Issues {
-				fmt.Fprintf(w, "- **%s**: %s\n", is.Severity, is.Message)
-				if is.Fix != "" {
-					fmt.Fprintf(w, "  ```sql\n  %s\n  ```\n", is.Fix)
-				}
-			}
-			fmt.Fprintln(w)
-		}
-	default:
-		for i, r := range results {
-			st := "PASS"
-			if !r.Pass {
-				st = "FAIL"
-			}
-			fmt.Fprintf(w, "[%s] Q%d: %s\n", st, i+1, trunc(r.Query, 80))
-			for _, is := range r.Issues {
-				fmt.Fprintf(w, "  %s: %s\n", is.Severity, is.Message)
-				if is.Fix != "" {
-					fmt.Fprintf(w, "  fix: %s\n", is.Fix)
-				}
-			}
-		}
+
+	formatter, err := GetFormatter(format)
+	if err != nil {
+		fmt.Fprintf(w, "Error: %v\n", err)
+		return 1
+	}
+
+	analysis := ResultsToAnalysis(results)
+	output, fmtErr := formatter.Format(analysis)
+	if fmtErr != nil {
+		fmt.Fprintf(w, "Error formatting output: %v\n", fmtErr)
+		return 1
+	}
+
+	fmt.Fprint(w, output)
+	if len(output) > 0 && output[len(output)-1] != '\n' {
+		fmt.Fprintln(w)
 	}
 	return code
 }
 
-func trunc(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > n {
-		return s[:n] + "..."
-	}
-	return s
-}
